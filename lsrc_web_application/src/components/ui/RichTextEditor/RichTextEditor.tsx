@@ -1,7 +1,7 @@
 // src/components/ui/RichTextEditor/RichTextEditor.tsx
 import { useMemo } from 'react';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';                    // ← ĐỔI
+import 'react-quill-new/dist/quill.snow.css';                // ← ĐỔI
 import './RichTextEditor.css';
 
 export type RichTextEditorProps = {
@@ -32,7 +32,7 @@ const TOOLBAR_CONFIG = {
     [{ align: [] }],
     [{ list: 'ordered' }, { list: 'bullet' }],
     ['blockquote', 'code-block'],
-    ['link', 'image'], // ← Bỏ 'video'
+    ['link', 'image'],
     ['clean'],
   ],
   basic: [
@@ -54,7 +54,7 @@ const FORMATS = {
     'align',
     'list', 'bullet',
     'blockquote', 'code-block',
-    'link', 'image', // ← Bỏ 'video'
+    'link', 'image',
   ],
   basic: ['bold', 'italic', 'underline', 'strike', 'list', 'bullet', 'link'],
   minimal: ['bold', 'italic', 'underline'],
