@@ -1,0 +1,540 @@
+====================================================
+HỆ THỐNG CHAT REALTIME - MÔ TẢ CHỨC NĂNG
+====================================================
+
+Cấu trúc thư mục:
+src/components/elearning/chat/
+├── ChatWidget.tsx                          (Widget nổi)
+├── ChatWindow.tsx                          (Cửa sổ chat chính)
+├── ChatWindowHeader.tsx                    (Header)
+├── ChatMessageList.tsx                     (Danh sách tin nhắn)
+├── ChatMessageInput.tsx                    (Input gửi tin)
+├── MessageBubble.tsx                       (Bong bóng tin nhắn)
+│
+├── hooks/
+│   └── useChatWindow.ts                    (Custom hook)
+│
+├── views/
+│   ├── ChatView.tsx                        (View chat)
+│   ├── MembersView.tsx                     (View thành viên)
+│   └── AddMembersView.tsx                  (View thêm thành viên)
+│
+└── context-menu/
+    └── ParticipantContextMenu.tsx          (Menu chuột phải)
+
+
+====================================================
+1. ChatWidget.tsx - WIDGET CHAT NỔI
+====================================================
+
+CHỨC NĂNG:
+- Hiển thị nút chat nổi ở góc phải màn hình
+- Badge thông báo số tin nhắn chưa đọc (tổng)
+- Quản lý 2 tab chính: "Đoạn chat" và "Mới"
+- Tạo conversation mới (PRIVATE, GROUP, COURSE)
+- Render ChatWindow khi chọn conversation
+- Reset về danh sách mỗi lần mở widget
+
+CHI TIẾT:
+
+1.1. Nút chat nổi
+  - Vị trí: fixed bottom-6 right-6
+  - Hiển thị icon FaComments
+  - Badge đỏ với số unread (max 99+)
+  - Click để mở/đóng widget
+
+1.2. Tab "Đoạn chat" (Conversations)
+  - Search box tìm kiếm theo tên/preview
+  - Danh sách conversations (sắp xếp theo lastMessageAt)
+  - Hiển thị: avatar, tên, preview, unread count
+  - Icon phân biệt loại: PRIVATE, GROUP, COURSE
+
+1.3. Tab "Mới" (Contacts)
+  - Search box tìm giảng viên
+  - Mục "Giảng viên": danh sách teachers
+    → Click "Nhắn tin" để tạo PRIVATE chat
+  - Mục "Khóa học của tôi": danh sách courses
+    → Click "Vào chat" để tạo COURSE chat
+  - Nút "Tạo nhóm chat mới" (chỉ ADMIN/TEACHER)
+
+1.4. Modal tạo nhóm chat
+  - Input tên nhóm (bắt buộc)
+  - Chọn học viên từ các khóa học
+  - Hỗ trợ chọn tất cả học viên trong 1 khóa
+  - Hiển thị số lượng đã chọn
+
+1.5. Reset khi mở widget
+  - useEffect theo dõi isOpen
+  - Khi mở: gọi closeConversation() + set tab = 'conversations' + xóa search
+  - Đảm bảo widget luôn hiện danh sách, không giữ conversation cũ
+
+
+====================================================
+2. ChatWindow.tsx - CỬA SỔ CHAT CHÍNH
+====================================================
+
+CHỨC NĂNG:
+- Component cha quản lý toàn bộ cửa sổ chat
+- Quản lý 3 chế độ xem: chat, members, addMembers
+- Xử lý context menu (click chuột phải)
+- Xử lý toast thông báo
+- Kết nối hook useChatWindow
+
+CHI TIẾT:
+
+2.1. Quản lý View Mode
+  - 'chat': Hiển thị tin nhắn + input
+  - 'members': Hiển thị danh sách thành viên
+  - 'addMembers': Hiển thị form thêm thành viên
+
+2.2. Context Menu Handler
+  - Click chuột phải vào thành viên → mở menu
+  - Kiểm tra quyền trước khi mở (isActionable)
+  - Menu hiển thị các hành động phù hợp với role
+  - handleStartSelectMode: bật select mode + chọn member vừa click
+
+2.3. Toast Notifications
+  - Hiển thị thông báo thành công (xanh)
+  - Hiển thị thông báo lỗi (đỏ)
+  - Tự động ẩn sau 5 giây
+
+2.4. Action Handlers
+  - handleAction: Thực thi 1 hành động + toast
+  - handleBulkAction: Thực thi hàng loạt + toast
+  - handleMute1Hour/24Hours/Permanent
+  - handleBulkMute/Ban/Remove
+  - handleRemoveMember
+
+2.5. Truyền quyền cho Context Menu
+  - Truyền canTransferOwnership={chat.canTransferOwnership}
+  - Truyền selectMode và onStartSelectMode
+
+
+====================================================
+3. ChatWindowHeader.tsx - HEADER CỦA CỬA SỔ CHAT
+====================================================
+
+CHỨC NĂNG:
+- Hiển thị tiêu đề theo từng view mode
+- Nút back thông minh (2 chế độ)
+- Menu 3 chấm cho cả view chat và members
+
+CHI TIẾT:
+
+3.1. Nút Back (thông minh)
+  - Khi ở view chat: Quay về danh sách conversations
+  - Khi ở view members/addMembers: Quay về chat
+  - Chỉ có 1 nút duy nhất (không trùng)
+
+3.2. Tiêu đề theo view
+  - chat: Tên conversation + số thành viên
+  - members: "Thành viên (N)" + hướng dẫn "Click chuột phải để quản lý"
+  - addMembers: "Thêm thành viên"
+
+3.3. Menu 3 chấm
+  - Hiển thị cho CẢ 2 view: chat và members
+  - View chat: option "Xem thành viên"
+  - View members: option "Thêm thành viên" (chỉ khi canManage)
+
+3.4. Bỏ nút FaUserPlus riêng
+  - Không còn nút thêm thành viên trực tiếp trên header view members
+  - Đã chuyển vào menu 3 chấm
+
+
+====================================================
+4. views/ChatView.tsx - VIEW CHAT
+====================================================
+
+CHỨC NĂNG:
+- Wrapper gom ChatMessageList + ChatMessageInput
+- Đồng nhất cấu trúc với 2 view khác
+
+CHI TIẾT:
+
+4.1. Nhận props
+  - messages, typingUsers, currentUserId
+  - participants, isLoadingMore, hasMoreMessages
+  - onLoadOlderMessages, onSend, onTyping
+
+4.2. Render
+  - ChatMessageList (danh sách tin nhắn)
+  - ChatMessageInput (input gửi tin)
+
+
+====================================================
+5. ChatMessageList.tsx - DANH SÁCH TIN NHẮN
+====================================================
+
+CHỨC NĂNG:
+- Hiển thị danh sách tin nhắn
+- Tự động scroll xuống cuối khi có tin mới
+- Lazy loading khi scroll lên đầu
+- Hiển thị typing indicator
+
+CHI TIẾT:
+
+5.1. Auto Scroll
+  - Scroll xuống cuối khi messages thay đổi
+  - Delay 150ms để DOM render xong
+
+5.2. Lazy Loading
+  - Detect scroll < 50px → load tin nhắn cũ
+  - Hiển thị spinner khi đang load
+  - Dừng khi hết tin nhắn
+
+5.3. Typing Indicator
+  - Hiển thị "X, Y đang gõ..."
+  - Animation 3 chấm nhấp nháy
+
+5.4. Render Messages
+  - Map qua MessageBubble cho từng tin nhắn
+  - Phân biệt tin của mình (phải) và người khác (trái)
+
+
+====================================================
+6. ChatMessageInput.tsx - INPUT GỬI TIN
+====================================================
+
+CHỨC NĂNG:
+- Input nhập tin nhắn
+- Gửi tin khi nhấn Enter hoặc click button
+- Gửi typing indicator
+
+CHI TIẾT:
+
+6.1. State
+  - input: nội dung đang nhập
+
+6.2. Handle Submit
+  - Enter hoặc click button → gửi tin
+  - Xóa input sau khi gửi
+
+6.3. Handle Change
+  - Cập nhật state
+  - Gọi onTyping() để gửi typing indicator
+
+6.4. Button Send
+  - Disabled khi input rỗng
+  - Icon FaPaperPlane màu xanh
+
+
+====================================================
+7. MessageBubble.tsx - BONG BÓNG TIN NHẮN
+====================================================
+
+CHỨC NĂNG:
+- Hiển thị 1 tin nhắn với 6 loại khác nhau
+- Phân biệt tin của mình và người khác
+- Hỗ trợ sửa/xóa inline
+
+CHI TIẾT:
+
+7.1. Loại tin nhắn (6 loại)
+  - TEXT: Văn bản thường
+  - IMAGE: Hình ảnh (click mở tab mới)
+  - FILE: File đính kèm (có size, download)
+  - VIDEO: Video player với controls
+  - AUDIO: Audio player
+  - SYSTEM: Thông báo hệ thống (giữa màn hình)
+
+7.2. Phân biệt người gửi
+  - Tin của mình: Bên phải, màu xanh #49BBBD
+  - Tin người khác: Bên trái, màu trắng, có tên sender
+
+7.3. Trạng thái
+  - Time: HH:mm (format vi-VN)
+  - Đã gửi: Icon FaCheckDouble
+  - Đã sửa: "(đã sửa)" bên cạnh time
+
+7.4. Actions (hover)
+  - Nút Sửa: Click → chuyển sang edit mode
+  - Nút Xóa: Click → gọi onDelete
+  - Chỉ hiện với tin của mình
+
+7.5. Edit Mode
+  - Input tại chỗ
+  - Enter để lưu, Escape để hủy
+  - Nút "Lưu" và "Hủy"
+
+
+====================================================
+8. views/MembersView.tsx - VIEW THÀNH VIÊN
+====================================================
+
+CHỨC NĂNG:
+- Hiển thị danh sách thành viên
+- Select mode bật qua context menu (không còn nút riêng)
+- Bulk actions: Mute, Ban, Remove
+- Context menu (click chuột phải)
+
+CHI TIẾT:
+
+8.1. Toolbar
+  - Khi KHÔNG ở select mode:
+    → Hiển thị hint: "Chuột phải vào thành viên để thao tác"
+    → Không có nút "Chọn nhiều" / "Thêm TV"
+  - Khi Ở select mode:
+    → Nút "Thoát" (thoát select mode)
+    → Nút "Tất cả" (chọn tất cả actionable members)
+    → Nút "Bỏ chọn"
+    → Bulk actions: Mute 1h (N), Ban (N), Xóa (N)
+
+8.2. Danh sách thành viên
+  - Avatar (chữ cái đầu)
+  - Tên + role icon (Crown/Shield)
+  - Label role + trạng thái mute/ban
+  - Checkbox khi ở select mode
+  - Click chuột phải → context menu
+
+8.3. Role Icons
+  - OWNER: FaCrown (vàng)
+  - ADMIN: FaUserShield (xanh dương)
+  - MODERATOR: FaUserShield (xanh lá)
+  - MEMBER: Không có icon
+
+8.4. Bỏ nút "Thêm thành viên mới" ở bottom
+  - Đã chuyển vào menu 3 chấm trên header
+
+8.5. Props
+  - onExitSelectMode: chỉ thoát select mode (không toggle)
+  - Không còn onShowAddMembers
+
+
+====================================================
+9. views/AddMembersView.tsx - VIEW THÊM THÀNH VIÊN
+====================================================
+
+CHỨC NĂNG:
+- Chọn học viên từ các khóa học để thêm vào nhóm
+- Lọc bỏ thành viên đã tồn tại
+- Batch add
+
+CHI TIẾT:
+
+9.1. Danh sách khóa học
+  - Mỗi khóa là 1 collapsible section
+  - Click để expand/collapse
+  - Chỉ load students 1 lần
+
+9.2. Danh sách học viên
+  - Chỉ hiển thị học viên chưa là thành viên
+  - Checkbox để chọn
+  - Nút "Chọn tất cả" cho mỗi khóa
+
+9.3. Footer
+  - Nút "Hủy" → quay về chat
+  - Nút "Thêm (N)" → batch add
+  - Hiển thị spinner khi đang thêm
+
+9.4. Xử lý trùng lặp
+  - Lọc bỏ học viên đã tồn tại trước khi gửi API
+  - Hiển thị toast số lượng bỏ qua
+  - Xử lý lỗi 409 (Conflict)
+
+
+====================================================
+10. context-menu/ParticipantContextMenu.tsx
+====================================================
+
+CHỨC NĂNG:
+- Menu chuột phải vào thành viên
+- Hiển thị các hành động theo quyền
+- Tự động flip lên/xuống theo không gian màn hình
+- Tự động đóng khi click ra ngoài/Escape
+
+CHI TIẾT:
+
+10.1. Header Menu
+  - Tên thành viên
+  - Label role
+
+10.2. Option "Chọn nhiều"
+  - Hiển thị ĐẦU TIÊN khi chưa ở select mode
+  - Click → bật select mode + tự động chọn member vừa right-click
+  - Chỉ hiện khi canManage hoặc canModerate
+
+10.3. Hành động (theo quyền)
+
+  Với OWNER hoặc SUPER_ADMIN:
+    - Cấp quyền ADMIN
+    - Cấp quyền MODERATOR
+    - Thu hồi quyền
+    - Mute 1h/24h/vĩnh viễn
+    - Unmute
+    - Ban/Unban
+    - Chuyển quyền OWNER
+    - Xóa khỏi nhóm
+
+  Với ADMIN conv:
+    - Cấp quyền MODERATOR
+    - Thu hồi quyền
+    - Mute 1h/24h/vĩnh viễn
+    - Unmute
+    - Ban/Unban
+    - Xóa khỏi nhóm
+
+  Với MODERATOR:
+    - Mute 1h/24h
+    - Unmute
+
+10.4. Vị trí thông minh
+  - Ưu tiên hiện xuống dưới tại vị trí chuột
+  - Nếu không đủ chỗ dưới VÀ trên rộng hơn → lật lên trên
+  - Nếu menu quá cao → clamp + scroll (max-h-[420px] overflow-y-auto)
+  - Dùng useLayoutEffect + getBoundingClientRect để đo
+  - visibility: hidden cho tới khi đo xong (tránh flash)
+  - Z-index cao (200)
+
+10.5. Prop mới
+  - canTransferOwnership: dùng cho nút "Chuyển quyền OWNER"
+
+
+====================================================
+11. hooks/useChatWindow.ts - CUSTOM HOOK
+====================================================
+
+CHỨC NĂNG:
+- Quản lý state UI của ChatWindow
+- Xác định role của user (phân biệt 3 tầng quyền)
+- Check quyền thao tác
+
+CHI TIẾT:
+
+11.1. State
+  - localParticipants: Copy để update UI
+  - viewMode: 'chat' | 'members' | 'addMembers'
+  - selectMode: Đang chọn nhiều hay không
+  - selectedMemberIds: Set ID đã chọn
+
+11.2. Computed Values
+  - isSystemAdmin: User có role hệ thống = ADMIN
+  - isConvOwner: Role trong conversation = OWNER (không tính super admin)
+  - isOwner: isConvOwner || isSystemAdmin
+  - canManage: isSystemAdmin || isConvOwner || convRole === 'ADMIN'
+  - canModerate: canManage || convRole === 'MODERATOR'
+  - canTransferOwnership: isConvOwner || isSystemAdmin
+
+11.3. Methods
+  - isActionable(p): Check có thể thao tác member này không
+    → Không phải chính mình
+    → Không phải OWNER (trừ khi mình là OWNER hoặc SUPER_ADMIN)
+  - toggleSelectMode(): Bật/tắt select mode
+  - toggleSelectMember(id): Chọn/bỏ chọn 1 member (có check isActionable)
+  - handleSelectAll(): Chọn tất cả actionable members
+  - handleClearSelection(): Bỏ chọn tất cả
+
+
+====================================================
+12. QUY LUẬT CHUYỂN DỊCH ROLE (BACKEND)
+====================================================
+
+12.1. Định nghĩa SUPER_ADMIN
+  - Là user có system role = ADMIN
+  - Có mọi quyền trong mọi conversation
+  - Kể cả khi không phải participant của conversation đó
+  - Backend check qua ChatPermissionServiceImpl.isSuperAdmin(accountId)
+
+12.2. Bảng quyền
+
+  Hành động        | SUPER_ADMIN | Conv OWNER | Conv ADMIN | Conv MOD | MEMBER
+  -----------------|-------------|------------|------------|----------|--------
+  Cấp ADMIN        |     Có      |     Có     |   Không    |  Không   | Không
+  Cấp MOD          |     Có      |     Có     |     Có     |  Không   | Không
+  Thu hồi ADMIN    |     Có      |     Có     |   Không    |  Không   | Không
+  Thu hồi MOD      |     Có      |     Có     |     Có     |  Không   | Không
+  Transfer OWNER   |     Có      |     Có     |   Không    |  Không   | Không
+  Mute             |     Có      |     Có     |     Có     |    Có    | Không
+  Ban              |     Có      |     Có     |     Có     |  Không   | Không
+  Xóa TV           |     Có      |     Có     |     Có     |  Không   | Không
+
+12.3. Chuyển quyền OWNER (transferOwnership)
+
+  Điều kiện:
+    - SUPER_ADMIN hoặc conv OWNER mới gọi được
+    - New owner phải là participant đang active
+    - Không cho chuyển cho chính mình
+
+  Kết quả:
+    - Old owner (nếu là participant):
+        roleInConversation = ADMIN (không phải MEMBER)
+        isAdmin = true
+    - New owner:
+        roleInConversation = OWNER
+        isAdmin = true
+
+  Hệ quả:
+    - Chỉ có 1 OWNER tại mọi thời điểm
+    - OWNER cũ → ADMIN conv (vẫn có quyền quản lý, chỉ mất quyền transfer)
+    - SUPER_ADMIN có thể transfer nhiều lần (không bị mất quyền)
+
+12.4. Quy luật khác
+
+  grantRole:
+    - Cấp ADMIN: OWNER hoặc SUPER_ADMIN
+    - Cấp MOD: OWNER, ADMIN hoặc SUPER_ADMIN
+
+  revokeRole:
+    - Không thu hồi được OWNER (trừ SUPER_ADMIN)
+    - Thu hồi ADMIN: OWNER hoặc SUPER_ADMIN
+
+  muteMember:
+    - MOD, ADMIN, OWNER, SUPER_ADMIN
+    - Không mute OWNER (trừ SUPER_ADMIN)
+
+  banMember:
+    - ADMIN, OWNER, SUPER_ADMIN
+    - Không ban OWNER (trừ SUPER_ADMIN)
+
+  removeParticipant:
+    - ADMIN, OWNER, SUPER_ADMIN
+    - Không xóa OWNER (trừ SUPER_ADMIN)
+
+
+====================================================
+TỔNG HỢP CÁC TÍNH NĂNG CHÍNH
+====================================================
+
+A. QUẢN LÝ CONVERSATION
+   - Tạo PRIVATE/GROUP/COURSE chat
+   - Danh sách conversations với search
+   - Badge unread count
+   - Preview tin nhắn cuối
+   - Reset về danh sách mỗi lần mở widget
+
+B. TIN NHẮN
+   - Gửi/nhận realtime qua WebSocket
+   - 6 loại tin: text, image, file, video, audio, system
+   - Sửa/xóa tin nhắn (soft delete)
+   - Lazy loading tin nhắn cũ
+   - Typing indicator
+   - Đánh dấu đã đọc
+
+C. QUẢN LÝ THÀNH VIÊN
+   - Xem danh sách thành viên
+   - Thêm thành viên từ khóa học (qua menu 3 chấm)
+   - Xóa thành viên
+   - Phân quyền: OWNER, ADMIN, MODERATOR, MEMBER
+   - SUPER_ADMIN có mọi quyền
+
+D. PHÂN QUYỀN
+   - Cấp/thu hồi quyền ADMIN, MODERATOR
+   - Chuyển quyền OWNER
+   - Mute 1h/24h/vĩnh viễn
+   - Unmute
+   - Ban/Unban vĩnh viễn
+   - Select mode qua context menu (thay vì nút riêng)
+
+E. UI/UX
+   - Toast notifications
+   - Context menu (chuột phải) - flip lên/xuống thông minh
+   - Menu 3 chấm cho cả view chat và members
+   - Bulk actions (chọn nhiều qua context menu)
+   - Select mode
+   - Auto scroll
+   - Responsive design
+
+F. TÍCH HỢP
+   - Custom hook useChatWindow (local)
+   - Hook useChat (global, từ ChatWidget)
+   - WebSocket realtime
+   - Notification system

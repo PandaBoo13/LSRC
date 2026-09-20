@@ -1,0 +1,16 @@
+Teacher ở /instructor/courses/75/students/4
+   ↓ Bấm "Xem chi tiết" trên quiz 156
+Navigate → /learn/75/quiz/156?studentId=4
+   ↓ QuizPage load
+   - Detect isViewStudent = true, isPrivileged = true
+   - getQuizById(156) → hiện intro
+   - getAttemptsByQuiz(156) → filter accountId === 4 → lấy history CỦA STUDENT 4
+   ↓ Render
+   - Banner cyan: "Bạn đang xem bài kiểm tra này như học viên thấy"
+   - Tab Intro: hiển thị thông tin quiz (title, mô tả, số câu, điểm đạt...)
+     + Nút "Bắt đầu làm bài" → đổi thành nút "Xem đề bài" (bấm → setShowQuestions=true)
+   - Tab History: hiển thị các attempt của student 4
+   ↓ Bấm "Xem đề bài"
+   - getQuestionsByQuiz(156) → fetch câu hỏi learner view (không có đáp án)
+   - Hiển thị câu hỏi + options read-only (giống student thấy khi làm)
+   - Banner "Xem đề bài — Không thể tương tác"

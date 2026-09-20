@@ -1,0 +1,19 @@
+# Deployment files (local only)
+*.md
+!OC01/README.md
+deploy/
+deploy-server.sh
+DEPLOY_README.md
+DEPLOY_COMMANDS.md
+
+# Excel files
+*.xlsx
+
+# Docker (keep Dockerfile)
+docker-compose.yml
+.dockerignore
+
+# Secrets
+.env
+.env.local
+.env.production
