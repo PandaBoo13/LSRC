@@ -15,8 +15,8 @@ export function CheckoutPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
-  // ✅ Dùng currency context — LẤY THÊM targetCurrency + rate
-  const { convertFormatted, targetCurrency, rate } = useCurrency();
+  // ✅ Chỉ còn dùng convertFormatted — targetCurrency và rate do BE tự tính
+  const { convertFormatted } = useCurrency();
 
   const coursesParam = searchParams.get('courses');
   const orderIdParam = searchParams.get('orderId');
@@ -105,25 +105,24 @@ export function CheckoutPage() {
         console.log('🟡 Dùng order hiện tại:', orderId);
       } else {
         console.log('🟡 Tạo order mới...');
-        const order = await createOrder(selectedCourseIds);
-        orderId = order.id;
-        console.log('🔵 Order created:', order);
+        const result = await createOrder(selectedCourseIds);
+
+        // ✅ Nếu khóa MIỄN PHÍ → BE đã enroll sẵn, không qua thanh toán
+        if (result.isFreeOrder) {
+          showToast("Đăng ký khóa học miễn phí thành công!", "success");
+          setTimeout(() => navigate(`/my-courses`), 1200);
+          return;
+        }
+
+        orderId = result.order.id;
+        console.log('🔵 Order created:', result.order);
       }
 
-      // ✅ Gửi kèm currency + paidAmount theo đơn vị user đang xem
-      // - amount: SGD gốc (giữ cho tương thích + verify)
-      // - currency: 'VND', 'USD', ...
-      // - paidAmount: subtotal × rate = số tiền theo currency user xem
-      const paidAmount = subtotal * rate;
-
-      console.log(`💰 [Checkout] ${subtotal} SGD × ${rate} = ${paidAmount} ${targetCurrency}`);
-
+      // ✅ PaymentRequest mới chỉ còn orderId + paymentMethod
+      // BE tự tính amount từ order.finalAmount × rate
       const response = await processPayment({
         orderId,
         paymentMethod,
-        amount: subtotal,
-        currency: targetCurrency,
-        paidAmount,
       });
 
       console.log('🟢 Payment Response:', response);
